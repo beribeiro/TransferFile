@@ -6,9 +6,17 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -38,13 +46,13 @@ public class ProcessadorArquivos {
 		File path = new File(origem);
 
 		for (File file : path.listFiles()) {
-			Set<String> dados = this.lerArquivo(file);
+			List<String> dados = this.lerArquivo(file);
 			this.gravarArquivo(destino, dados, file.getName());
 			this.gerarExcel(dados, destino, file.getName());
 		}
 	}
 
-	public Set<String> lerArquivo(File file) {
+	public List<String> lerArquivo(File file) {
 		Set<String> dados = new HashSet<>();
 		try {
 			FileReader arq = new FileReader(file.getAbsoluteFile());
@@ -64,10 +72,61 @@ public class ProcessadorArquivos {
 			System.err.printf("Erro na abertura do arquivo: %s.\n",
 					e.getMessage());
 		}
-		return dados;
+		List<String> list = new ArrayList<String>(dados);
+
+        Collections.sort(list, new Comparator<String>() {
+
+              @Override
+
+              public int compare(String o1, String o2) {
+
+                     try {
+
+                           SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yy hh:mm");
+
+                           Date data1 = sdf.parse(o1.substring(21,35));
+
+                           Date data2 = sdf.parse(o2.substring(21,35));
+
+                           String texto1 = o1.substring(0,20);
+
+                           String texto2 = o2.substring(0,20);
+
+                           int result = -1;
+
+                           int compareDate = data1.compareTo(data2);
+
+                           int compareString = texto1.compareTo(texto2);
+
+                          
+
+                           if(compareString == 0){
+
+                                 if(compareDate != 0)
+
+                                       result = compareDate;
+
+                           }else
+
+                                 result = compareString;
+
+                          
+
+                           return result;
+
+                     } catch (ParseException e) {
+
+                           return 0;
+
+                     }
+
+              }
+
+        });
+		return list;
 	}
 
-	public void gravarArquivo(String destino, Set<String> Dados, String filename) {
+	public void gravarArquivo(String destino, List<String> Dados, String filename) {
 		try {
 			PrintWriter writer = new PrintWriter(destino + filename, "UTF-8");
 			for (String string : Dados) {
@@ -82,7 +141,7 @@ public class ProcessadorArquivos {
 
 	}
 
-	public void gerarExcel(Set<String> dados, String destino, String filename) {
+	public void gerarExcel(List<String> dados, String destino, String filename) {
 		try {
 			String[] columns = { "USERNAME", "TIMESTAMP", "ACTION", "SCHEMA",
 					"OBJECT_NAME", "SQL CODE" };
