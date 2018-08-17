@@ -29,26 +29,30 @@ public class ProcessadorArquivos {
 		InputStream input = null;
 		try {
 			String filename = "config.properties";
-    		input = ProcessadorArquivos.class.getClassLoader().getResourceAsStream(filename);
-    		if(input==null){
-    	            System.out.println("Sorry, unable to find " + filename);
-    		    return;
-    		}
-    		prop.load(input);
+			input = ProcessadorArquivos.class.getClassLoader().getResourceAsStream(filename);
+			if (input == null) {
+				System.out.println("Sorry, unable to find " + filename);
+				return;
+			}
+			prop.load(input);
 		} catch (FileNotFoundException e) {
 			System.out.println(e.getMessage());
 		} catch (IOException e) {
 			System.out.println(e.getMessage());
 		}
-
+		// Definindo a Origem e Destino de acordo com o config.properties
 		String origem = prop.getProperty("origem");
 		String destino = prop.getProperty("destino");
 		File path = new File(origem);
 
+		// Executando os métodos lerArquivo, gravarArquivo e gerarExcel para cada
+		// arquivo que termine com .txt
 		for (File file : path.listFiles()) {
-			List<String> dados = this.lerArquivo(file);
-			this.gravarArquivo(destino, dados, file.getName());
-			this.gerarExcel(dados, destino, file.getName());
+			if (file.getName().toLowerCase().endsWith((".txt"))) {
+				List<String> dados = this.lerArquivo(file);
+				this.gravarArquivo(destino, dados, file.getName());
+				this.gerarExcel(dados, destino, file.getName());
+			}
 		}
 	}
 
@@ -59,70 +63,71 @@ public class ProcessadorArquivos {
 			BufferedReader lerArq = new BufferedReader(arq);
 			String linha = lerArq.readLine();
 			while (linha != null) {
-
-				if (((linha.contains("insert") || linha.contains("delete") || linha
-						.contains("update")) && !linha.substring(1, 10).trim()
-						.equals(""))) {
+				// Aplicando os filtros, separando apenas as linhas que contenha "Insert, delete
+				// ou update" e linhas que não começe com 10 espaços em branco
+				if (((linha.contains("insert") || linha.contains("delete") || linha.contains("update"))
+						&& !linha.substring(1, 10).trim().equals(""))) {
 					dados.add(linha);
 				}
 				linha = lerArq.readLine();
 			}
 			lerArq.close();
 		} catch (IOException e) {
-			System.err.printf("Erro na abertura do arquivo: %s.\n",
-					e.getMessage());
+			System.err.printf("Erro na abertura do arquivo: %s.\n", e.getMessage());
 		}
+		// Convertendo Set em List para realizar o ordenamento dos dados
 		List<String> list = new ArrayList<String>(dados);
 
-        Collections.sort(list, new Comparator<String>() {
+		Collections.sort(list, new Comparator<String>() {
 
-              @Override
+			@Override
+			// Comparador da primeira coluna (data), e da segunda coluna
+			public int compare(String o1, String o2) {
 
-              public int compare(String o1, String o2) {
+				try {
 
-                     try {
+					SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yy hh:mm");
 
-                           SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yy hh:mm");
+					Date data1 = sdf.parse(o1.substring(21, 35));
 
-                           Date data1 = sdf.parse(o1.substring(21,35));
+					Date data2 = sdf.parse(o2.substring(21, 35));
 
-                           Date data2 = sdf.parse(o2.substring(21,35));
+					String texto1 = o1.substring(0, 20);
 
-                           String texto1 = o1.substring(0,20);
+					String texto2 = o2.substring(0, 20);
 
-                           String texto2 = o2.substring(0,20);
+					int result = -1;
 
-                           int result = -1;
+					// Compara a linha x com a linha x+1, organizando por data (Do antigo pro mais
+					// novo)
+					int compareDate = data1.compareTo(data2);
 
-                           int compareDate = data1.compareTo(data2);
+					// Compara a linha x com a linha x+1, organizando por ordem alfabética
+					int compareString = texto1.compareTo(texto2);
 
-                           int compareString = texto1.compareTo(texto2);
+					// Lógica para ordenar a segunda coluna apenas depois que a primeira coluna já
+					// estiver ordenada
+					if (compareString == 0) {
 
-                          
+						if (compareDate != 0)
 
-                           if(compareString == 0){
+							result = compareDate;
 
-                                 if(compareDate != 0)
+					} else
 
-                                       result = compareDate;
+						result = compareString;
 
-                           }else
+					return result;
 
-                                 result = compareString;
+				} catch (ParseException e) {
 
-                          
+					return 0;
 
-                           return result;
+				}
 
-                     } catch (ParseException e) {
+			}
 
-                           return 0;
-
-                     }
-
-              }
-
-        });
+		});
 		return list;
 	}
 
@@ -135,18 +140,16 @@ public class ProcessadorArquivos {
 			writer.flush();
 			writer.close();
 		} catch (IOException e) {
-			System.err.printf("Erro na abertura do arquivo: %s.\n",
-					e.getMessage());
+			System.err.printf("Erro na abertura do arquivo: %s.\n", e.getMessage());
 		}
 
 	}
 
 	public void gerarExcel(List<String> dados, String destino, String filename) {
 		try {
-			String[] columns = { "USERNAME", "TIMESTAMP", "ACTION", "SCHEMA",
-					"OBJECT_NAME", "SQL CODE" };
+			String[] columns = { "USERNAME", "TIMESTAMP", "ACTION", "SCHEMA", "OBJECT_NAME", "SQL CODE" };
 			// Create a Workbook
-			Workbook workbook = new HSSFWorkbook(); 
+			Workbook workbook = new HSSFWorkbook();
 			// Create a Sheet
 			Sheet sheet = workbook.createSheet("Teste");
 
