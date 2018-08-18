@@ -9,6 +9,7 @@ import java.io.PrintWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -24,7 +25,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
 public class ProcessadorArquivos {
-	public void verificaArquivos() {
+	public List<File> verificaArquivos() {
 		Properties prop = new Properties();
 		InputStream input = null;
 		try {
@@ -32,7 +33,6 @@ public class ProcessadorArquivos {
 			input = ProcessadorArquivos.class.getClassLoader().getResourceAsStream(filename);
 			if (input == null) {
 				System.out.println("Sorry, unable to find " + filename);
-				return;
 			}
 			prop.load(input);
 		} catch (FileNotFoundException e) {
@@ -40,44 +40,49 @@ public class ProcessadorArquivos {
 		} catch (IOException e) {
 			System.out.println(e.getMessage());
 		}
-		// Definindo a Origem e Destino de acordo com o config.properties
+		// Definindo a Origem de acordo com o config.properties
 		String origem = prop.getProperty("origem");
-		String destino = prop.getProperty("destino");
 		File path = new File(origem);
 
 		// Executando os métodos lerArquivo, gravarArquivo e gerarExcel para cada
 		// arquivo que termine com .txt
-		for (File file : path.listFiles()) {
+		List<File> a = new ArrayList<File>(Arrays.asList(path.listFiles()));
+		return a;
+
+	}
+
+	public void lerArquivo(List<File> listaarquivos) {
+		for (File file : listaarquivos) {
 			if (file.getName().toLowerCase().endsWith((".txt"))) {
-				List<String> dados = this.lerArquivo(file);
-				this.gravarArquivo(destino, dados, file.getName());
-				this.gerarExcel(dados, destino, file.getName());
+				Set<String> dados = new HashSet<>();
+				try {
+					FileReader arq = new FileReader(file.getAbsoluteFile());
+					BufferedReader lerArq = new BufferedReader(arq);
+					String linha = lerArq.readLine();
+					while (linha != null) {
+						// Aplicando os filtros, separando apenas as linhas que contenha "Insert, delete
+						// ou update" e linhas que não começe com 10 espaços em branco
+						if (((linha.contains("insert") || linha.contains("delete") || linha.contains("update"))
+								&& !linha.substring(1, 10).trim().equals(""))) {
+							dados.add(linha);
+						}
+						linha = lerArq.readLine();
+					}
+					lerArq.close();
+				} catch (IOException e) {
+					System.err.printf("Erro na abertura do arquivo: %s.\n", e.getMessage());
+				}
+				// Convertendo Set em List para realizar o ordenamento dos dados
+				List<String> list = new ArrayList<String>(dados);
+				orderByDateAndString(list);
+				this.gerarTxt(list, file.getName());
+				this.gerarExcel(list, file.getName());
 			}
 		}
 	}
 
-	public List<String> lerArquivo(File file) {
-		Set<String> dados = new HashSet<>();
-		try {
-			FileReader arq = new FileReader(file.getAbsoluteFile());
-			BufferedReader lerArq = new BufferedReader(arq);
-			String linha = lerArq.readLine();
-			while (linha != null) {
-				// Aplicando os filtros, separando apenas as linhas que contenha "Insert, delete
-				// ou update" e linhas que não começe com 10 espaços em branco
-				if (((linha.contains("insert") || linha.contains("delete") || linha.contains("update"))
-						&& !linha.substring(1, 10).trim().equals(""))) {
-					dados.add(linha);
-				}
-				linha = lerArq.readLine();
-			}
-			lerArq.close();
-		} catch (IOException e) {
-			System.err.printf("Erro na abertura do arquivo: %s.\n", e.getMessage());
-		}
-		// Convertendo Set em List para realizar o ordenamento dos dados
-		List<String> list = new ArrayList<String>(dados);
-
+	private void orderByDateAndString(List<String> list) {
+		// Alterar para Java 8
 		Collections.sort(list, new Comparator<String>() {
 
 			@Override
@@ -128,11 +133,15 @@ public class ProcessadorArquivos {
 			}
 
 		});
-		return list;
 	}
 
-	public void gravarArquivo(String destino, List<String> Dados, String filename) {
+	public void gerarTxt(List<String> Dados, String filename) {
 		try {
+			Properties prop = new Properties();
+			String config = "config.properties";
+			InputStream input = ProcessadorArquivos.class.getClassLoader().getResourceAsStream(config);
+			prop.load(input);
+			String destino = prop.getProperty("destino");
 			PrintWriter writer = new PrintWriter(destino + filename, "UTF-8");
 			for (String string : Dados) {
 				writer.println(string);
@@ -145,8 +154,13 @@ public class ProcessadorArquivos {
 
 	}
 
-	public void gerarExcel(List<String> dados, String destino, String filename) {
+	public void gerarExcel(List<String> dados, String filename) {
 		try {
+			Properties prop = new Properties();
+			String config = "config.properties";
+			InputStream input = ProcessadorArquivos.class.getClassLoader().getResourceAsStream(config);
+			prop.load(input);
+			String destino = prop.getProperty("destino");
 			String[] columns = { "USERNAME", "TIMESTAMP", "ACTION", "SCHEMA", "OBJECT_NAME", "SQL CODE" };
 			// Create a Workbook
 			Workbook workbook = new HSSFWorkbook();
